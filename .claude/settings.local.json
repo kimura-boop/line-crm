@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git clone *)",
+      "Bash(xargs cat)",
+      "Bash(pnpm install *)",
+      "Bash(npm install *)",
+      "Bash(sudo npm install -g pnpm@9.15.4)",
+      "Bash(npx pnpm@9.15.4 install)",
+      "Bash(npx *)",
+      "Bash(curl *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'イベント: {d[\\\\\"title\\\\\"]}, スロット: {len\\(d[\\\\\"slots\\\\\"]\\)}件'\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('OK:', d['title'], len\\(d['slots']\\), 'slots'\\)\")",
+      "Bash(xargs ls -t)",
+      "Bash(npm run *)"
+    ]
+  }
+}
