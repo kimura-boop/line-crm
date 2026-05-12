@@ -36,21 +36,14 @@ function exportCsv(registrations: Registration[], eventTitle: string) {
   const rows = registrations.map(r => {
     const d = new Date(r.eventDate + 'T12:00:00+09:00')
     const DAYS = ['日','月','火','水','木','金','土']
-    const dateStr = `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`
-    return [
-      r.displayName,
-      r.participantType === 'external' ? '外部生' : 'スクール生',
-      dateStr,
-      r.timeSlot,
-      new Date(r.createdAt).toLocaleString('ja-JP'),
-    ]
+    return [r.displayName, r.participantType === 'external' ? '外部生' : 'スクール生', `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`, r.timeSlot, new Date(r.createdAt).toLocaleString('ja-JP')]
   })
   const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${eventTitle}_申し込み一覧_${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `${eventTitle}_${new Date().toISOString().slice(0,10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -63,15 +56,11 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'slots' | 'list' | 'add-slot'>('slots')
-
-  // 手動追加フォーム
   const [addName, setAddName] = useState('')
   const [addSlotId, setAddSlotId] = useState('')
   const [addType, setAddType] = useState('external')
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState('')
-
-  // 日程追加フォーム
   const [newDate, setNewDate] = useState('')
   const [newTimeSlot, setNewTimeSlot] = useState('')
   const [newCapacity, setNewCapacity] = useState('8')
@@ -86,7 +75,6 @@ export default function EventsPage() {
   const loadEventDetail = useCallback(async (event: Event) => {
     setSelectedEvent(event)
     setDetailLoading(true)
-    setAddSlotId('')
     try {
       const [slotData, regData] = await Promise.all([
         fetchApi<{ slots: Slot[] }>(`/api/events/${event.id}`),
@@ -111,7 +99,6 @@ export default function EventsPage() {
         setAddName('')
         setAddSlotId('')
         await loadEventDetail(selectedEvent)
-        setActiveTab('list')
       } else {
         setAddError(res.error === 'capacity_exceeded' ? '満席のため追加できません' : res.error || 'エラーが発生しました')
       }
@@ -147,14 +134,14 @@ export default function EventsPage() {
     setSlotLoading(false)
   }
 
-  const totalRegistrations = registrations.length
-  const recentCount = registrations.filter(r => (new Date().getTime() - new Date(r.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000).length
-
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + 'T12:00:00+09:00')
     const DAYS = ['日','月','火','水','木','金','土']
     return `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`
   }
+
+  const totalRegistrations = registrations.length
+  const recentCount = registrations.filter(r => (new Date().getTime() - new Date(r.createdAt).getTime()) < 7*24*60*60*1000).length
 
   return (
     <div>
@@ -162,7 +149,7 @@ export default function EventsPage() {
 
       <div className="mb-6">
         <div className="flex flex-wrap gap-2">
-          {loading ? <div className="text-sm text-gray-400">読み込み中...</div> : events.length === 0 ? <div className="text-sm text-gray-400">イベントがありません</div> : events.map(event => (
+          {loading ? <div className="text-sm text-gray-400">読み込み中...</div> : events.map(event => (
             <button key={event.id} onClick={() => loadEventDetail(event)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedEvent?.id === event.id ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               style={selectedEvent?.id === event.id ? { backgroundColor: '#06C755' } : {}}>
@@ -196,22 +183,15 @@ export default function EventsPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
               <button onClick={() => setActiveTab('slots')} className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === 'slots' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>日程別残席</button>
-              <button onClick={() => setActiveTab('list')} className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>申し込み一覧</button>
+              <button onClick={() => setActiveTab('list')} className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>申し込み一覧・手動追加</button>
               <button onClick={() => setActiveTab('add-slot')} className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === 'add-slot' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>＋ 日程追加</button>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => { setActiveTab('list'); }} className="px-4 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style={{ backgroundColor: '#06C755' }}
-                onClick={() => setActiveTab('list')}>
-                ＋ 手動追加
-              </button>
-              <button onClick={() => exportCsv(registrations, selectedEvent.title)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                CSV
-              </button>
-            </div>
+            <button onClick={() => exportCsv(registrations, selectedEvent.title)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              CSV出力
+            </button>
           </div>
 
-          {/* 日程別残席 */}
           {activeTab === 'slots' && (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <table className="w-full">
@@ -254,17 +234,13 @@ export default function EventsPage() {
             </div>
           )}
 
-          {/* 申し込み一覧 + 手動追加フォーム */}
           {activeTab === 'list' && (
             <div className="space-y-4">
-              {/* 手動追加フォーム */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">手動で申し込みを追加</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <input
-                    type="text" placeholder="お名前" value={addName} onChange={e => setAddName(e.target.value)}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+                  <input type="text" placeholder="お名前" value={addName} onChange={e => setAddName(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
                   <select value={addSlotId} onChange={e => setAddSlotId(e.target.value)}
                     className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
                     <option value="">日程を選択</option>
@@ -286,7 +262,6 @@ export default function EventsPage() {
                 {addError && <p className="mt-2 text-xs text-red-500">{addError}</p>}
               </div>
 
-              {/* 一覧テーブル */}
               <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
                 {registrations.length === 0 ? (
                   <div className="p-8 text-center text-gray-400">申し込みがありません</div>
@@ -329,7 +304,6 @@ export default function EventsPage() {
             </div>
           )}
 
-          {/* 日程追加 */}
           {activeTab === 'add-slot' && (
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h3 className="text-sm font-semibold text-gray-700 mb-4">新しい日程を追加</h3>
