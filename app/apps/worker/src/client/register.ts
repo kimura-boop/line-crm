@@ -216,7 +216,7 @@ function render(): void {
           ? 'reg-radio-label selected'
           : 'reg-radio-label';
       const badgeCls = slot.is_full ? 'reg-badge full' : slot.remaining <= 3 ? 'reg-badge warn' : 'reg-badge ok';
-      const badgeText = slot.is_full ? '満員' : `残${slot.remaining}席`;
+      const badgeText = slot.is_full ? '満席' : slot.remaining <= 2 ? '残りわずか' : slot.remaining <= 5 ? 'あと少し' : '余裕あり';
       return `
         <label class="${cls}">
           <input type="radio" name="reg-sunday-${escapeHtml(date)}" value="${escapeHtml(slot.id)}"
