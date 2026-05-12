@@ -31,7 +31,7 @@ interface Registration {
   createdAt: string
 }
 
-function exportCsv(registrations: Registration[], eventTitle: string) {
+function exportCsv(registrations: Registration[], eventTitle: string, dateFilter: string) {
   const headers = ['名前', '種別', '日程', '時間帯', '申し込み日時']
   const rows = registrations.map(r => {
     const d = new Date(r.eventDate + 'T12:00:00+09:00')
@@ -43,7 +43,7 @@ function exportCsv(registrations: Registration[], eventTitle: string) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${eventTitle}_${new Date().toISOString().slice(0,10)}.csv`
+  a.download = `${eventTitle}${dateFilter ? '_' + dateFilter : ''}_${new Date().toISOString().slice(0,10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -65,6 +65,7 @@ export default function EventsPage() {
   const [newTimeSlot, setNewTimeSlot] = useState('')
   const [newCapacity, setNewCapacity] = useState('8')
   const [slotLoading, setSlotLoading] = useState(false)
+  const [dateFilter, setDateFilter] = useState('all')
 
   useEffect(() => {
     fetchApi<Event[]>('/api/events')
@@ -75,6 +76,7 @@ export default function EventsPage() {
   const loadEventDetail = useCallback(async (event: Event) => {
     setSelectedEvent(event)
     setDetailLoading(true)
+    setDateFilter('all')
     try {
       const [slotData, regData] = await Promise.all([
         fetchApi<{ slots: Slot[] }>(`/api/events/${event.id}`),
@@ -140,6 +142,14 @@ export default function EventsPage() {
     return `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`
   }
 
+  // 日付一覧（重複なし）
+  const uniqueDates = [...new Set(registrations.map(r => r.eventDate))].sort()
+
+  // フィルター済み申し込み
+  const filteredRegistrations = dateFilter === 'all'
+    ? registrations
+    : registrations.filter(r => r.eventDate === dateFilter)
+
   const totalRegistrations = registrations.length
   const recentCount = registrations.filter(r => (new Date().getTime() - new Date(r.createdAt).getTime()) < 7*24*60*60*1000).length
 
@@ -186,9 +196,10 @@ export default function EventsPage() {
               <button onClick={() => setActiveTab('list')} className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>申し込み一覧・手動追加</button>
               <button onClick={() => setActiveTab('add-slot')} className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${activeTab === 'add-slot' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>＋ 日程追加</button>
             </div>
-            <button onClick={() => exportCsv(registrations, selectedEvent.title)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700">
+            <button onClick={() => exportCsv(filteredRegistrations, selectedEvent.title, dateFilter !== 'all' ? formatDate(dateFilter) : '')}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-700">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              CSV出力
+              CSV出力{dateFilter !== 'all' ? '（絞り込み中）' : ''}
             </button>
           </div>
 
@@ -262,8 +273,28 @@ export default function EventsPage() {
                 {addError && <p className="mt-2 text-xs text-red-500">{addError}</p>}
               </div>
 
+              {/* 日付フィルター */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-xs text-gray-500 font-medium">日付で絞り込み：</span>
+                <button onClick={() => setDateFilter('all')}
+                  className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors ${dateFilter === 'all' ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  style={dateFilter === 'all' ? { backgroundColor: '#06C755' } : {}}>
+                  すべて（{registrations.length}件）
+                </button>
+                {uniqueDates.map(date => {
+                  const count = registrations.filter(r => r.eventDate === date).length
+                  return (
+                    <button key={date} onClick={() => setDateFilter(date)}
+                      className={`px-3 py-1.5 text-xs rounded-full font-medium transition-colors ${dateFilter === date ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      style={dateFilter === date ? { backgroundColor: '#06C755' } : {}}>
+                      {formatDate(date)}（{count}件）
+                    </button>
+                  )
+                })}
+              </div>
+
               <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-                {registrations.length === 0 ? (
+                {filteredRegistrations.length === 0 ? (
                   <div className="p-8 text-center text-gray-400">申し込みがありません</div>
                 ) : (
                   <table className="w-full min-w-[600px]">
@@ -278,7 +309,7 @@ export default function EventsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {registrations.map(r => (
+                      {filteredRegistrations.map(r => (
                         <tr key={r.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.displayName}</td>
                           <td className="px-4 py-3">
