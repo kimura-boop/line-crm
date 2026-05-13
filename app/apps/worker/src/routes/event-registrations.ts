@@ -134,6 +134,9 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
 
   // LINE Push: 確認メッセージ送信
   c.executionCtx.waitUntil(
+    sendEmailNotification(c.env, displayName, registeredSlots, body.participantType)
+  );
+  c.executionCtx.waitUntil(
     sendConfirmationMessage(
       c.env.DB,
       event.line_account_id,
@@ -172,7 +175,7 @@ async function sendConfirmationMessage(
     // 日程一覧（日付順）
     const sortedSlots = [...slots].sort((a, b) => a.event_date.localeCompare(b.event_date));
     const dateList = sortedSlots.map((s) => {
-      const d = new Date(s.event_date + 'T00:00:00+09:00');
+      const [yy, mm, dd] = s.event_date.split('-').map(Number); const d = { getMonth: () => mm - 1, getDate: () => dd, getDay: () => new Date(s.event_date + 'T12:00:00+09:00').getDay() };
       return `・${d.getMonth() + 1}月${d.getDate()}日（${DAYS_JA[d.getDay()]}）${s.time_slot}`;
     }).join('\n');
 
@@ -299,3 +302,77 @@ eventRegistrations.get('/api/events/:id/registrations', async (c) => {
 });
 
 export { eventRegistrations };
+
+// 手動申し込み追加（管理者用）
+eventRegistrations.post('/api/events/:id/registrations', async (c) => {
+  const eventId = c.req.param('id')
+  const body = await c.req.json<{
+    slotId?: string
+    displayName?: string
+    participantType?: string
+  }>()
+
+  if (!body.slotId || !body.displayName || !body.participantType) {
+    return c.json({ success: false, error: 'Missing required fields' }, 400)
+  }
+
+  const slot = await getEventSlotById(c.env.DB, body.slotId)
+  if (!slot || slot.event_id !== eventId) {
+    return c.json({ success: false, error: 'Slot not found' }, 404)
+  }
+
+  const result = await createEventRegistration(c.env.DB, {
+    eventSlotId: body.slotId,
+    friendId: null,
+    lineUserId: `manual_${crypto.randomUUID()}`,
+    displayName: body.displayName,
+    participantType: body.participantType,
+  })
+
+  if (!result.success) {
+    return c.json({ success: false, error: result.error }, 409)
+  }
+
+  return c.json({ success: true, registration: result.registration }, 201)
+})
+
+// 申し込みキャンセル（管理者用）
+eventRegistrations.delete('/api/events/:eventId/registrations/:registrationId', async (c) => {
+  await cancelEventRegistration(c.env.DB, c.req.param('registrationId'))
+  return c.json({ success: true })
+})
+
+// メール通知送信
+async function sendEmailNotification(
+  env: { RESEND_API_KEY?: string },
+  displayName: string,
+  slots: { event_date: string; time_slot: string }[],
+  participantType: string,
+): Promise<void> {
+  const apiKey = (env as Record<string, string>).RESEND_API_KEY
+  if (!apiKey) return
+
+  const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土']
+  const dateList = slots.map((s) => {
+    const d = new Date(s.event_date + 'T12:00:00+09:00')
+    return `・${d.getMonth() + 1}月${d.getDate()}日（${DAYS_JA[d.getDay()]}）${s.time_slot}`
+  }).join('\n')
+
+  const typeLabel = participantType === 'external' ? '外部生' : 'スクール生'
+  const subject = `【BJトレセン】新しい申し込みがありました - ${displayName}さん`
+  const text = `新しい申し込みがありました。\n\n【申込者】${displayName}\n【種別】${typeLabel}\n【日程】\n${dateList}\n\n管理画面: https://line-crm-pi.vercel.app/events`
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'onboarding@resend.dev',
+      to: ['kimura@bj-academy.com', 'kobayashi@bj-academy.com', 'hiraiyuuto@gmail.com'],
+      subject,
+      text,
+    }),
+  })
+}
