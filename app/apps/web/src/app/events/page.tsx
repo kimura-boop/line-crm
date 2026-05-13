@@ -119,6 +119,15 @@ export default function EventsPage() {
     } catch { /* silent */ }
   }
 
+  const handleDeleteSlot = async (slotId: string, dateStr: string) => {
+    if (!selectedEvent) return
+    if (!confirm(`${formatDate(dateStr)} の日程を削除しますか？`)) return
+    try {
+      await fetchApi(`/api/events/${selectedEvent.id}/slots/${slotId}`, { method: 'DELETE' })
+      await loadEventDetail(selectedEvent)
+    } catch { /* silent */ }
+  }
+
   const handleAddSlot = async () => {
     if (!selectedEvent || !newDate || !newTimeSlot || !newCapacity) return
     setSlotLoading(true)
@@ -142,14 +151,8 @@ export default function EventsPage() {
     return `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`
   }
 
-  // 日付一覧（重複なし）
   const uniqueDates = [...new Set(registrations.map(r => r.eventDate))].sort()
-
-  // フィルター済み申し込み
-  const filteredRegistrations = dateFilter === 'all'
-    ? registrations
-    : registrations.filter(r => r.eventDate === dateFilter)
-
+  const filteredRegistrations = dateFilter === 'all' ? registrations : registrations.filter(r => r.eventDate === dateFilter)
   const totalRegistrations = registrations.length
   const recentCount = registrations.filter(r => (new Date().getTime() - new Date(r.createdAt).getTime()) < 7*24*60*60*1000).length
 
@@ -213,6 +216,7 @@ export default function EventsPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">申し込み</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">残席</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">状況</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -233,9 +237,17 @@ export default function EventsPage() {
                         </td>
                         <td className="px-4 py-3 text-sm font-bold" style={{ color: slot.remaining === 0 ? '#ef4444' : slot.remaining <= 2 ? '#f59e0b' : '#06C755' }}>{slot.remaining}席</td>
                         <td className="px-4 py-3">
-                          {slot.is_full ? <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-600 font-medium">満席</span>
-                            : slot.remaining <= 2 ? <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-600 font-medium">残りわずか</span>
+                          {slot.is_full
+                            ? <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-600 font-medium">満席</span>
+                            : slot.remaining <= 2
+                            ? <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-600 font-medium">残りわずか</span>
                             : <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-600 font-medium">受付中</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => handleDeleteSlot(slot.id, slot.event_date)}
+                            className="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                            削除
+                          </button>
                         </td>
                       </tr>
                     )
@@ -273,7 +285,6 @@ export default function EventsPage() {
                 {addError && <p className="mt-2 text-xs text-red-500">{addError}</p>}
               </div>
 
-              {/* 日付フィルター */}
               <div className="flex flex-wrap gap-2 items-center">
                 <span className="text-xs text-gray-500 font-medium">日付で絞り込み：</span>
                 <button onClick={() => setDateFilter('all')}
