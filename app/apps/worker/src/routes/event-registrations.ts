@@ -10,6 +10,7 @@ import {
   getEventSlotById,
   createEventRegistration,
   getEventRegistrations,
+  cancelEventRegistration,
   getFriendByLineUserId,
 } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -362,7 +363,7 @@ async function sendEmailNotification(
   const subject = `【BJトレセン】新しい申し込みがありました - ${displayName}さん`
   const text = `新しい申し込みがありました。\n\n【申込者】${displayName}\n【種別】${typeLabel}\n【日程】\n${dateList}\n\n管理画面: https://line-crm-pi.vercel.app/events`
 
-  await fetch('https://api.resend.com/emails', {
+  const emailRes = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -370,9 +371,11 @@ async function sendEmailNotification(
     },
     body: JSON.stringify({
       from: 'onboarding@resend.dev',
-      to: ['kimura@bj-academy.com', 'kobayashi@bj-academy.com', 'hiraiyuuto@gmail.com'],
+      to: ['bjtc@bj-academy.com'],
       subject,
       text,
     }),
   })
+  const emailResText = await emailRes.text()
+  console.log("[email] status:", emailRes.status, "body:", emailResText)
 }
