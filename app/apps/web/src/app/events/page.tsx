@@ -36,7 +36,7 @@ function exportCsv(registrations: Registration[], eventTitle: string, dateFilter
   const rows = registrations.map(r => {
     const d = new Date(r.eventDate + 'T12:00:00+09:00')
     const DAYS = ['日','月','火','水','木','金','土']
-    return [r.displayName, r.participantType === 'external' ? '外部生' : 'スクール生', `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`, r.timeSlot, new Date(r.createdAt).toLocaleString('ja-JP')]
+    return [r.displayName, r.participantType === 'general' ? '一般生' : r.participantType === 'coupon' ? '回数券利用' : 'スクール生', `${d.getMonth()+1}月${d.getDate()}日（${DAYS[d.getDay()]}）`, r.timeSlot, new Date(r.createdAt).toLocaleString('ja-JP')]
   })
   const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -58,7 +58,7 @@ export default function EventsPage() {
   const [activeTab, setActiveTab] = useState<'slots' | 'list' | 'add-slot'>('slots')
   const [addName, setAddName] = useState('')
   const [addSlotId, setAddSlotId] = useState('')
-  const [addType, setAddType] = useState('external')
+  const [addType, setAddType] = useState('general')
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState('')
   const [newDate, setNewDate] = useState('')
@@ -273,7 +273,8 @@ export default function EventsPage() {
                   </select>
                   <select value={addType} onChange={e => setAddType(e.target.value)}
                     className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
-                    <option value="external">外部生</option>
+                    <option value="general">一般生</option>
+                    <option value="coupon">回数券利用</option>
                     <option value="school">スクール生</option>
                   </select>
                   <button onClick={handleAddRegistration} disabled={addLoading || !addName || !addSlotId}
@@ -325,7 +326,7 @@ export default function EventsPage() {
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.displayName}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 text-xs rounded-full font-medium ${r.participantType === 'external' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
-                              {r.participantType === 'external' ? '外部生' : 'スクール生'}
+                              {r.participantType === 'general' ? '一般生' : r.participantType === 'coupon' ? '回数券利用' : 'スクール生'}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700">{formatDate(r.eventDate)}</td>

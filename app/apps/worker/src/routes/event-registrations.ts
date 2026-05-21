@@ -20,7 +20,8 @@ const eventRegistrations = new Hono<Env>();
 
 const PRICES: Record<string, number> = {
   school: 1980,
-  external: 2200,
+  general: 2200,
+  coupon: 0,
 };
 
 // LINE IDトークンを検証して { sub, name } を返す
@@ -183,7 +184,7 @@ async function sendConfirmationMessage(
     const count = sortedSlots.length;
     const pricePerDay = PRICES[participantType] ?? 1980;
     const total = pricePerDay * count;
-    const typeLabel = participantType === 'external' ? '外部生' : 'スクール生';
+    const typeLabel = participantType === 'general' ? '一般生' : participantType === 'coupon' ? '回数券利用' : 'スクール生';
 
     const confirmText =
       `✅ お申し込みありがとうございます！\n\n` +
@@ -359,7 +360,7 @@ async function sendEmailNotification(
     return `・${d.getMonth() + 1}月${d.getDate()}日（${DAYS_JA[d.getDay()]}）${s.time_slot}`
   }).join('\n')
 
-  const typeLabel = participantType === 'external' ? '外部生' : 'スクール生'
+  const typeLabel = participantType === 'general' ? '一般生' : participantType === 'coupon' ? '回数券利用' : 'スクール生'
   const subject = `【BJトレセン】新しい申し込みがありました - ${displayName}さん`
   const text = `新しい申し込みがありました。\n\n【申込者】${displayName}\n【種別】${typeLabel}\n【日程】\n${dateList}\n\n管理画面: https://line-crm-pi.vercel.app/events`
 

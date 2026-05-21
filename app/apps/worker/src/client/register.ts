@@ -41,7 +41,7 @@ interface RegisterState {
   event: EventData | null;
   selectedDates: Set<string>;
   sundaySlots: Map<string, string>;  // Sunday date → chosen slotId
-  participantType: 'school' | 'external' | null;
+  participantType: 'school' | 'general' | 'coupon' | null;
   submitting: boolean;
 }
 
@@ -55,7 +55,7 @@ const state: RegisterState = {
   submitting: false,
 };
 
-const PRICES = { school: 1980, external: 2200 } as const;
+const PRICES = { school: 1980, general: 2200, coupon: 0 } as const;
 const DAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
 
 function escapeHtml(str: string): string {
@@ -171,8 +171,10 @@ function render(): void {
       <div style="display:flex;gap:10px;">
         <button class="type-btn ${participantType === 'school' ? 'type-btn-active' : ''}"
           data-type="school">スクール生<br><span style="font-size:11px;font-weight:400;">1,980円/日</span></button>
-        <button class="type-btn ${participantType === 'external' ? 'type-btn-active' : ''}"
-          data-type="external">外部生<br><span style="font-size:11px;font-weight:400;">2,200円/日</span></button>
+        <button class="type-btn ${participantType === 'general' ? 'type-btn-active' : ''}"
+          data-type="general">一般生<br><span style="font-size:11px;font-weight:400;">2,200円/日</span></button>
+        <button class="type-btn ${participantType === 'coupon' ? 'type-btn-active' : ''}"
+          data-type="coupon">回数券利用<br><span style="font-size:11px;font-weight:400;">0円</span></button>
       </div>
     </div>
   `;
@@ -287,7 +289,7 @@ function attachEvents(): void {
   // 参加種別
   app.querySelectorAll('[data-type]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      state.participantType = (btn as HTMLElement).dataset.type as 'school' | 'external';
+      state.participantType = (btn as HTMLElement).dataset.type as 'school' | 'general' | 'coupon';
       render();
     });
   });
