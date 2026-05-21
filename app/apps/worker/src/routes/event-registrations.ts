@@ -79,7 +79,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
     return c.json({ success: false, error: 'idToken, slotIds, and participantType are required' }, 400);
   }
 
-  if (!PRICES[body.participantType]) {
+  if (PRICES[body.participantType] === undefined) {
     return c.json({ success: false, error: 'Invalid participantType' }, 400);
   }
 
