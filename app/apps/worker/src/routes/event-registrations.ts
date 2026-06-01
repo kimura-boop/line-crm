@@ -193,12 +193,21 @@ async function sendConfirmationMessage(
       `【参加費】${typeLabel}\n` +
       `${pricePerDay.toLocaleString()}円 × ${count}日 = ${total.toLocaleString()}円`;
 
-    const bankText = `💳 振込先情報\n\n${bankInfo}`;
+    const cancelText = `⚠️ キャンセル規定\n\nキャンセルについては開催日の3日前までは無料キャンセルが可能となります。それ以降は100%キャンセル料がかかりますのでご注意ください。返金に関しては振込手数料を除いた金額を返金させていただきます。`;
 
-    await lineClient.pushMessage(lineUserId, [
-      { type: 'text', text: confirmText },
-      { type: 'text', text: bankText },
-    ]);
+    if (participantType === 'coupon') {
+      await lineClient.pushMessage(lineUserId, [
+        { type: 'text', text: confirmText },
+        { type: 'text', text: cancelText },
+      ]);
+    } else {
+      const bankText = `💳 振込先情報\n\n${bankInfo}`;
+      await lineClient.pushMessage(lineUserId, [
+        { type: 'text', text: confirmText },
+        { type: 'text', text: bankText },
+        { type: 'text', text: cancelText },
+      ]);
+    }
   } catch (e) {
     console.error('[event-registrations] Failed to send confirmation message:', e);
   }
