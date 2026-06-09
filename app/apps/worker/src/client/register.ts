@@ -1,13 +1,5 @@
 /**
  * LIFF Event Registration Page — イベント申し込みフォーム（複数日程対応）
- *
- * Flow:
- * 1. LINEプロフィール取得 → お名前を自動表示
- * 2. 参加種別を選択（スクール生 / 外部生）
- * 3. 参加日程をチェックボックスで複数選択
- * 4. 日曜日を選んだ場合は時間帯を選択（平日は17:00-18:30 固定）
- * 5. 申し込みボタン → APIへ送信
- * 6. 完了画面表示（LINEにメッセージが届く）
  */
 
 declare const liff: {
@@ -40,8 +32,9 @@ interface RegisterState {
   idToken: string | null;
   event: EventData | null;
   selectedDates: Set<string>;
-  sundaySlots: Map<string, string>;  // Sunday date → chosen slotId
+  sundaySlots: Map<string, Set<string>>;
   participantType: 'school' | 'general' | 'coupon' | null;
+  isFirstVisit: boolean | null;
   submitting: boolean;
 }
 
@@ -52,6 +45,7 @@ const state: RegisterState = {
   selectedDates: new Set(),
   sundaySlots: new Map(),
   participantType: null,
+  isFirstVisit: null,
   submitting: false,
 };
 
@@ -65,19 +59,18 @@ function escapeHtml(str: string): string {
 }
 
 function formatDateJa(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00+09:00');
+  const d = new Date(dateStr + 'T12:00:00+09:00');
   return `${d.getMonth() + 1}月${d.getDate()}日（${DAYS_JA[d.getDay()]}）`;
 }
 
 function isSunday(dateStr: string): boolean {
-  return new Date(dateStr + 'T00:00:00+09:00').getDay() === 0;
+  return new Date(dateStr + 'T12:00:00+09:00').getDay() === 0;
 }
 
 function getApp(): HTMLElement {
   return document.getElementById('app')!;
 }
 
-// 選択済みスロットID一覧を返す。未確定なら null
 function resolveSlotIds(): string[] | null {
   const { event, selectedDates, sundaySlots } = state;
   if (!event || selectedDates.size === 0) return null;
@@ -85,11 +78,10 @@ function resolveSlotIds(): string[] | null {
   const ids: string[] = [];
   for (const date of selectedDates) {
     if (isSunday(date)) {
-      const slotId = sundaySlots.get(date);
-      if (!slotId) return null; // 日曜の時間帯未選択
-      ids.push(slotId);
+      const slotIds = sundaySlots.get(date);
+      if (!slotIds || slotIds.size === 0) return null;
+      for (const slotId of slotIds) ids.push(slotId);
     } else {
-      // 平日: 当日唯一の（空きのある）スロットを自動選択
       const slot = event.slots.find((s) => s.event_date === date);
       if (!slot) return null;
       ids.push(slot.id);
@@ -97,8 +89,6 @@ function resolveSlotIds(): string[] | null {
   }
   return ids;
 }
-
-// ── Rendering ─────────────────────────────────────────────────────────────────
 
 export function renderLoading(message = '読み込み中...'): void {
   getApp().innerHTML = `
@@ -155,20 +145,35 @@ function renderSuccess(count: number): void {
 }
 
 function render(): void {
-  const { profile, event, selectedDates, sundaySlots, participantType } = state;
+  const { profile, event, selectedDates, sundaySlots, participantType, isFirstVisit } = state;
   if (!profile || !event) return;
 
   const uniqueDates = [...new Set(event.slots.map((s) => s.event_date))].sort();
   const slotIds = resolveSlotIds();
-  const count = selectedDates.size;
+  const count = selectedDates.size + (
+    [...sundaySlots.values()].reduce((acc, s) => acc + Math.max(0, s.size - 1), 0)
+  );
   const price = participantType ? PRICES[participantType] : 0;
-  const canSubmit = Boolean(slotIds && participantType);
+  const canSubmit = Boolean(slotIds && participantType && isFirstVisit !== null);
+
+  // ── 初参加選択 ──
+  const firstVisitHtml = `
+    <div class="reg-section">
+      <p class="reg-label">参加回数</p>
+      <div style="display:flex;gap:10px;">
+        <button class="type-btn ${isFirstVisit === true ? 'type-btn-active' : ''}"
+          data-visit="true">初参加</button>
+        <button class="type-btn ${isFirstVisit === false ? 'type-btn-active' : ''}"
+          data-visit="false">2回目以降</button>
+      </div>
+    </div>
+  `;
 
   // ── 参加種別 ──
   const typeHtml = `
     <div class="reg-section">
       <p class="reg-label">参加種別</p>
-      <div style="display:flex;gap:10px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="type-btn ${participantType === 'school' ? 'type-btn-active' : ''}"
           data-type="school">スクール生<br><span style="font-size:11px;font-weight:400;">1,980円/日</span></button>
         <button class="type-btn ${participantType === 'general' ? 'type-btn-active' : ''}"
@@ -179,18 +184,14 @@ function render(): void {
     </div>
   `;
 
-  // ── 日程選択（チェックボックス）──
+  // ── 日程選択 ──
   const datesHtml = uniqueDates.map((date) => {
     const slotsOnDate = event.slots.filter((s) => s.event_date === date);
     const allFull = slotsOnDate.every((s) => s.is_full);
     const isChecked = selectedDates.has(date);
     const sunday = isSunday(date);
     const timeLabel = sunday ? '時間帯を下で選択' : slotsOnDate[0]?.time_slot ?? '';
-    const cls = allFull
-      ? 'reg-radio-label disabled'
-      : isChecked
-        ? 'reg-radio-label selected'
-        : 'reg-radio-label';
+    const cls = allFull ? 'reg-radio-label disabled' : isChecked ? 'reg-radio-label selected' : 'reg-radio-label';
 
     return `
       <label class="${cls}">
@@ -205,23 +206,19 @@ function render(): void {
     `;
   }).join('');
 
-  // ── 日曜の時間帯選択 ──
+  // ── 日曜の時間帯選択（複数選択可） ──
   const selectedSundays = [...selectedDates].filter(isSunday).sort();
   const sundaySlotsHtml = selectedSundays.map((date) => {
     const slotsOnDate = event.slots.filter((s) => s.event_date === date);
-    const chosenId = sundaySlots.get(date) ?? '';
+    const chosenIds = sundaySlots.get(date) ?? new Set<string>();
     const slotsMarkup = slotsOnDate.map((slot) => {
-      const isChosen = chosenId === slot.id;
-      const cls = slot.is_full
-        ? 'reg-radio-label disabled'
-        : isChosen
-          ? 'reg-radio-label selected'
-          : 'reg-radio-label';
+      const isChosen = chosenIds.has(slot.id);
+      const cls = slot.is_full ? 'reg-radio-label disabled' : isChosen ? 'reg-radio-label selected' : 'reg-radio-label';
       const badgeCls = slot.is_full ? 'reg-badge full' : slot.remaining <= 3 ? 'reg-badge warn' : 'reg-badge ok';
-      const badgeText = slot.is_full ? '満席' : slot.remaining <= 2 ? '残りわずか' : slot.remaining <= 5 ? 'あと少し' : '余裕あり';
+      const badgeText = slot.is_full ? '満員' : slot.remaining <= 2 ? '残りわずか' : slot.remaining <= 5 ? 'あと少し' : '余裕あり';
       return `
         <label class="${cls}">
-          <input type="radio" name="reg-sunday-${escapeHtml(date)}" value="${escapeHtml(slot.id)}"
+          <input type="checkbox" name="reg-sunday-${escapeHtml(date)}" value="${escapeHtml(slot.id)}"
             ${isChosen ? 'checked' : ''} ${slot.is_full ? 'disabled' : ''}>
           <span>${escapeHtml(slot.time_slot)}</span>
           <span class="${badgeCls}">${badgeText}</span>
@@ -231,18 +228,19 @@ function render(): void {
 
     return `
       <div class="reg-section" style="border-left:3px solid #06C755;">
-        <p class="reg-label">${escapeHtml(formatDateJa(date))} の時間帯</p>
+        <p class="reg-label">${escapeHtml(formatDateJa(date))} の時間帯（複数選択可）</p>
         <div class="reg-options">${slotsMarkup}</div>
       </div>
     `;
   }).join('');
 
   // ── 料金確認 ──
-  const priceHtml = (count > 0 && participantType) ? `
+  const totalSlots = resolveSlotIds()?.length ?? 0;
+  const priceHtml = (totalSlots > 0 && participantType) ? `
     <div class="reg-section" style="background:#f0faf4;border-radius:10px;padding:14px 16px;">
       <p class="reg-label" style="margin-bottom:6px;">料金確認</p>
       <p style="font-size:15px;font-weight:700;color:#06C755;">
-        ${price.toLocaleString()}円 × ${count}日 = ${(price * count).toLocaleString()}円
+        ${price.toLocaleString()}円 × ${totalSlots}回 = ${(price * totalSlots).toLocaleString()}円
       </p>
       <p style="font-size:11px;color:#888;margin-top:4px;">申し込み後、振込先をLINEでお知らせします</p>
     </div>
@@ -261,6 +259,7 @@ function render(): void {
         <p class="reg-hint">LINEの登録名が自動表示されています</p>
       </div>
 
+      ${firstVisitHtml}
       ${typeHtml}
 
       <div class="reg-section">
@@ -269,12 +268,11 @@ function render(): void {
       </div>
 
       ${sundaySlotsHtml}
-
       ${priceHtml}
 
       <button class="reg-submit-btn ${canSubmit ? '' : 'disabled'}"
         data-action="submit" ${canSubmit ? '' : 'disabled'}>
-        申し込む（${count}日分）
+        申し込む（${totalSlots}回分）
       </button>
       <p class="reg-footer-note">申し込み完了後、LINEにメッセージが届きます</p>
     </div>
@@ -285,6 +283,14 @@ function render(): void {
 
 function attachEvents(): void {
   const app = getApp();
+
+  // 初参加選択
+  app.querySelectorAll('[data-visit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.isFirstVisit = (btn as HTMLElement).dataset.visit === 'true';
+      render();
+    });
+  });
 
   // 参加種別
   app.querySelectorAll('[data-type]').forEach((btn) => {
@@ -302,18 +308,24 @@ function attachEvents(): void {
         state.selectedDates.add(el.value);
       } else {
         state.selectedDates.delete(el.value);
-        state.sundaySlots.delete(el.value); // 選択解除時に時間帯もリセット
+        state.sundaySlots.delete(el.value);
       }
       render();
     });
   });
 
-  // 日曜の時間帯ラジオ
-  app.querySelectorAll('input[type="radio"][name^="reg-sunday-"]').forEach((input) => {
+  // 日曜の時間帯チェックボックス（複数選択）
+  app.querySelectorAll('input[type="checkbox"][name^="reg-sunday-"]').forEach((input) => {
     input.addEventListener('change', () => {
       const el = input as HTMLInputElement;
       const date = el.name.replace('reg-sunday-', '');
-      state.sundaySlots.set(date, el.value);
+      if (!state.sundaySlots.has(date)) state.sundaySlots.set(date, new Set());
+      const slotSet = state.sundaySlots.get(date)!;
+      if (el.checked) {
+        slotSet.add(el.value);
+      } else {
+        slotSet.delete(el.value);
+      }
       render();
     });
   });
@@ -322,13 +334,11 @@ function attachEvents(): void {
   app.querySelector('[data-action="submit"]')?.addEventListener('click', () => submitRegistration());
 }
 
-// ── API ───────────────────────────────────────────────────────────────────────
-
 async function submitRegistration(): Promise<void> {
   if (state.submitting) return;
-  const { idToken, event, participantType } = state;
+  const { idToken, event, participantType, isFirstVisit } = state;
   const slotIds = resolveSlotIds();
-  if (!idToken || !event || !slotIds || !participantType) return;
+  if (!idToken || !event || !slotIds || !participantType || isFirstVisit === null) return;
 
   state.submitting = true;
   renderLoading('申し込み中...');
@@ -337,7 +347,7 @@ async function submitRegistration(): Promise<void> {
     const res = await fetch(`/api/events/${event.id}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken, slotIds, participantType }),
+      body: JSON.stringify({ idToken, slotIds, participantType, isFirstVisit }),
     });
 
     if (res.ok) {
@@ -361,8 +371,6 @@ async function submitRegistration(): Promise<void> {
     renderError('通信エラーが発生しました。もう一度お試しください。', true);
   }
 }
-
-// ── Init ──────────────────────────────────────────────────────────────────────
 
 export async function initRegister(eventId: string | null): Promise<void> {
   if (!eventId) {

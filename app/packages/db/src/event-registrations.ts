@@ -208,6 +208,7 @@ export interface CreateRegistrationInput {
   lineUserId: string;
   displayName: string;
   participantType?: string;
+  isFirstVisit?: boolean;
 }
 
 export interface CreateRegistrationResult {
@@ -231,10 +232,10 @@ export async function createEventRegistration(
     await db
       .prepare(
         `INSERT INTO event_registrations
-           (id, event_slot_id, friend_id, line_user_id, display_name, participant_type, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
+           (id, event_slot_id, friend_id, line_user_id, display_name, participant_type, status, is_first_visit, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
       )
-      .bind(id, input.eventSlotId, input.friendId ?? null, input.lineUserId, input.displayName, input.participantType ?? 'school', now)
+      .bind(id, input.eventSlotId, input.friendId ?? null, input.lineUserId, input.displayName, input.participantType ?? 'school', input.isFirstVisit ? 1 : 0, now)
       .run();
   } catch (e) {
     const msg = String((e as Error).message ?? '');

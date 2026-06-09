@@ -73,6 +73,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
     idToken?: string;
     slotIds?: string[];
     participantType?: string;
+    isFirstVisit?: boolean;
   }>();
 
   if (!body.idToken || !body.slotIds?.length || !body.participantType) {
@@ -116,6 +117,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
       lineUserId,
       displayName,
       participantType: body.participantType,
+      isFirstVisit: body.isFirstVisit ?? false,
     });
 
     if (!result.success) {
@@ -147,6 +149,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
       registeredSlots,
       body.participantType,
       event.bank_info,
+      body.isFirstVisit ?? false,
     ),
   );
 
@@ -162,6 +165,7 @@ async function sendConfirmationMessage(
   slots: { event_date: string; time_slot: string }[],
   participantType: string,
   bankInfo: string,
+  isFirstVisit: boolean = false,
 ): Promise<void> {
   try {
     const account = await db
@@ -195,18 +199,24 @@ async function sendConfirmationMessage(
 
     const cancelText = `⚠️ キャンセル規定\n\nキャンセルについては開催日の3日前までは無料キャンセルが可能となります。それ以降は100%キャンセル料がかかりますのでご注意ください。返金に関しては振込手数料を除いた金額を返金させていただきます。`;
 
+    const firstVisitText = `📋 エントリーシートのご記入をお願いします\n\n初めてご参加される方は、リッチメニュー右下の「bjトレセンシート」をタップし、ご入力をお願いいたします。\n本シートは、これまでの既往歴やケガの受傷状況などを事前に確認し、当日の指導に活かすことを目的としております。\nお手数をおかけしますが、ご協力のほどよろしくお願いいたします。`;
+
     if (participantType === 'coupon') {
-      await lineClient.pushMessage(lineUserId, [
+      const messages: { type: string; text: string }[] = [
         { type: 'text', text: confirmText },
         { type: 'text', text: cancelText },
-      ]);
+      ];
+      if (isFirstVisit) messages.push({ type: 'text', text: firstVisitText });
+      await lineClient.pushMessage(lineUserId, messages);
     } else {
-      const bankText = `💳 振込先情報\n\n${bankInfo}`;
-      await lineClient.pushMessage(lineUserId, [
+      const bankText = `💳 振込先情報\n\n${bankInfo}\n\n振り込みが完了しましたら「振り込み完了」とメッセージをお願いします。`;
+      const messages: { type: string; text: string }[] = [
         { type: 'text', text: confirmText },
         { type: 'text', text: bankText },
         { type: 'text', text: cancelText },
-      ]);
+      ];
+      if (isFirstVisit) messages.push({ type: 'text', text: firstVisitText });
+      await lineClient.pushMessage(lineUserId, messages);
     }
   } catch (e) {
     console.error('[event-registrations] Failed to send confirmation message:', e);
