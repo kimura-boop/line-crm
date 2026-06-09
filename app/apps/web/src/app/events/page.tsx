@@ -325,7 +325,11 @@ export default function EventsPage() {
                         <tr key={r.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.displayName}</td>
                           <td className="px-4 py-3">
-                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${r.participantType === 'external' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                            <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                              r.participantType === 'general' ? 'bg-blue-100 text-blue-600' :
+                              r.participantType === 'coupon' ? 'bg-pink-100 text-pink-600' :
+                              'bg-purple-100 text-purple-600'
+                            }`}>
                               {r.participantType === 'general' ? '一般生' : r.participantType === 'coupon' ? '回数券利用' : 'スクール生'}
                             </span>
                           </td>
