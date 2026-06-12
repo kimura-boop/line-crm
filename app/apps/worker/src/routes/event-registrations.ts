@@ -74,6 +74,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
     slotIds?: string[];
     participantType?: string;
     isFirstVisit?: boolean;
+    participantCount?: number;
   }>();
 
   if (!body.idToken || !body.slotIds?.length || !body.participantType) {
@@ -118,6 +119,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
       displayName,
       participantType: body.participantType,
       isFirstVisit: body.isFirstVisit ?? false,
+      participantCount: body.participantCount ?? 1,
     });
 
     if (!result.success) {
@@ -150,6 +152,7 @@ eventRegistrations.post('/api/events/:id/register', async (c) => {
       body.participantType,
       event.bank_info,
       body.isFirstVisit ?? false,
+      body.participantCount ?? 1,
     ),
   );
 
@@ -166,6 +169,7 @@ async function sendConfirmationMessage(
   participantType: string,
   bankInfo: string,
   isFirstVisit: boolean = false,
+  participantCount: number = 1,
 ): Promise<void> {
   try {
     const account = await db
@@ -186,6 +190,7 @@ async function sendConfirmationMessage(
     }).join('\n');
 
     const count = sortedSlots.length;
+    const totalCount = count * participantCount;
     const pricePerDay = PRICES[participantType] ?? 1980;
     const total = pricePerDay * count;
     const typeLabel = participantType === 'general' ? '一般生' : participantType === 'coupon' ? '回数券利用' : 'スクール生';
@@ -193,9 +198,9 @@ async function sendConfirmationMessage(
     const confirmText =
       `✅ お申し込みありがとうございます！\n\n` +
       `${displayName}さんの申し込みを受け付けました。\n\n` +
-      `【申し込み日程（${count}日）】\n${dateList}\n\n` +
+      `【申し込み日程（${count}日 × ${participantCount}名）】\n${dateList}\n\n` +
       `【参加費】${typeLabel}\n` +
-      `${pricePerDay.toLocaleString()}円 × ${count}日 = ${total.toLocaleString()}円`;
+      `${pricePerDay.toLocaleString()}円 × ${totalCount}回 = ${(pricePerDay * totalCount).toLocaleString()}円`;
 
     const cancelText = `⚠️ キャンセル規定\n\nキャンセルについては開催日の3日前までは無料キャンセルが可能となります。それ以降は100%キャンセル料がかかりますのでご注意ください。返金に関しては振込手数料を除いた金額を返金させていただきます。`;
 

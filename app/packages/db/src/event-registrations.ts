@@ -209,6 +209,7 @@ export interface CreateRegistrationInput {
   displayName: string;
   participantType?: string;
   isFirstVisit?: boolean;
+  participantCount?: number;
 }
 
 export interface CreateRegistrationResult {
@@ -223,7 +224,8 @@ export async function createEventRegistration(
 ): Promise<CreateRegistrationResult> {
   const slot = await getEventSlotById(db, input.eventSlotId);
   if (!slot) return { success: false, error: 'slot_not_found' };
-  if (slot.is_full) return { success: false, error: 'capacity_exceeded' };
+  const count = input.participantCount ?? 1;
+  if (slot.remaining < count) return { success: false, error: 'capacity_exceeded' };
 
   const id = crypto.randomUUID();
   const now = jstNow();
@@ -232,10 +234,10 @@ export async function createEventRegistration(
     await db
       .prepare(
         `INSERT INTO event_registrations
-           (id, event_slot_id, friend_id, line_user_id, display_name, participant_type, status, is_first_visit, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
+           (id, event_slot_id, friend_id, line_user_id, display_name, participant_type, status, is_first_visit, participant_count, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?)`,
       )
-      .bind(id, input.eventSlotId, input.friendId ?? null, input.lineUserId, input.displayName, input.participantType ?? 'school', input.isFirstVisit ? 1 : 0, now)
+      .bind(id, input.eventSlotId, input.friendId ?? null, input.lineUserId, input.displayName, input.participantType ?? 'school', input.isFirstVisit ? 1 : 0, input.participantCount ?? 1, now)
       .run();
   } catch (e) {
     const msg = String((e as Error).message ?? '');
@@ -258,7 +260,7 @@ export async function getEventRegistrations(
 ): Promise<(EventRegistration & { event_date: string; time_slot: string })[]> {
   const result = await db
     .prepare(
-      `SELECT r.*, s.event_date, s.time_slot
+      `SELECT r.*, s.event_date, s.time_slot, r.participant_count
        FROM event_registrations r
        JOIN event_slots s ON s.id = r.event_slot_id
        WHERE s.event_id = ? AND r.status = 'confirmed'

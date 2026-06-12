@@ -35,6 +35,7 @@ interface RegisterState {
   sundaySlots: Map<string, Set<string>>;
   participantType: 'school' | 'general' | 'coupon' | null;
   isFirstVisit: boolean | null;
+  participantCount: number;
   submitting: boolean;
 }
 
@@ -46,6 +47,7 @@ const state: RegisterState = {
   sundaySlots: new Map(),
   participantType: null,
   isFirstVisit: null,
+  participantCount: 1,
   submitting: false,
 };
 
@@ -145,7 +147,7 @@ function renderSuccess(count: number): void {
 }
 
 function render(): void {
-  const { profile, event, selectedDates, sundaySlots, participantType, isFirstVisit } = state;
+  const { profile, event, selectedDates, sundaySlots, participantType, isFirstVisit, participantCount } = state;
   if (!profile || !event) return;
 
   const uniqueDates = [...new Set(event.slots.map((s) => s.event_date))].sort();
@@ -165,6 +167,19 @@ function render(): void {
           data-visit="true">初参加</button>
         <button class="type-btn ${isFirstVisit === false ? 'type-btn-active' : ''}"
           data-visit="false">2回目以降</button>
+      </div>
+    </div>
+  `;
+
+  // ── 参加人数 ──
+  const countHtml = `
+    <div class="reg-section">
+      <p class="reg-label">参加人数</p>
+      <div style="display:flex;gap:10px;">
+        ${[1,2,3,4].map(n => `
+          <button class="type-btn ${participantCount === n ? 'type-btn-active' : ''}"
+            data-count="${n}" style="min-width:56px;">${n}名</button>
+        `).join('')}
       </div>
     </div>
   `;
@@ -236,11 +251,12 @@ function render(): void {
 
   // ── 料金確認 ──
   const totalSlots = resolveSlotIds()?.length ?? 0;
+  const totalPeople = totalSlots * participantCount;
   const priceHtml = (totalSlots > 0 && participantType) ? `
     <div class="reg-section" style="background:#f0faf4;border-radius:10px;padding:14px 16px;">
       <p class="reg-label" style="margin-bottom:6px;">料金確認</p>
       <p style="font-size:15px;font-weight:700;color:#06C755;">
-        ${price.toLocaleString()}円 × ${totalSlots}回 = ${(price * totalSlots).toLocaleString()}円
+        ${price.toLocaleString()}円 × ${totalPeople}回 = ${(price * totalPeople).toLocaleString()}円
       </p>
       <p style="font-size:11px;color:#888;margin-top:4px;">申し込み後、振込先をLINEでお知らせします</p>
     </div>
@@ -260,6 +276,7 @@ function render(): void {
       </div>
 
       ${firstVisitHtml}
+      ${countHtml}
       ${typeHtml}
 
       <div class="reg-section">
@@ -272,7 +289,7 @@ function render(): void {
 
       <button class="reg-submit-btn ${canSubmit ? '' : 'disabled'}"
         data-action="submit" ${canSubmit ? '' : 'disabled'}>
-        申し込む（${totalSlots}回分）
+        申し込む（${totalSlots}日 × ${participantCount}名）
       </button>
       <p class="reg-footer-note">申し込み完了後、LINEにメッセージが届きます</p>
     </div>
@@ -283,6 +300,14 @@ function render(): void {
 
 function attachEvents(): void {
   const app = getApp();
+
+  // 参加人数
+  app.querySelectorAll('[data-count]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.participantCount = Number((btn as HTMLElement).dataset.count);
+      render();
+    });
+  });
 
   // 初参加選択
   app.querySelectorAll('[data-visit]').forEach((btn) => {
@@ -336,7 +361,7 @@ function attachEvents(): void {
 
 async function submitRegistration(): Promise<void> {
   if (state.submitting) return;
-  const { idToken, event, participantType, isFirstVisit } = state;
+  const { idToken, event, participantType, isFirstVisit, participantCount } = state;
   const slotIds = resolveSlotIds();
   if (!idToken || !event || !slotIds || !participantType || isFirstVisit === null) return;
 
@@ -347,7 +372,7 @@ async function submitRegistration(): Promise<void> {
     const res = await fetch(`/api/events/${event.id}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken, slotIds, participantType, isFirstVisit }),
+      body: JSON.stringify({ idToken, slotIds, participantType, isFirstVisit, participantCount }),
     });
 
     if (res.ok) {

@@ -316,6 +316,7 @@ export default function EventsPage() {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">種別</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">日程</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">時間帯</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">人数</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">申し込み日時</th>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">操作</th>
                       </tr>
@@ -335,6 +336,7 @@ export default function EventsPage() {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700">{formatDate(r.eventDate)}</td>
                           <td className="px-4 py-3 text-sm text-gray-700">{r.timeSlot}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{r.participantCount ?? 1}名</td>
                           <td className="px-4 py-3 text-xs text-gray-400">{new Date(r.createdAt).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                           <td className="px-4 py-3">
                             <button onClick={() => handleCancel(r.id, r.displayName)}
