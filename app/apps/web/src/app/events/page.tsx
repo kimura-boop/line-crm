@@ -28,6 +28,7 @@ interface Registration {
   eventDate: string
   timeSlot: string
   status: string
+  participantCount?: number
   createdAt: string
 }
 
