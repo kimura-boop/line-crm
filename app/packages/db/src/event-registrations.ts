@@ -73,7 +73,7 @@ export async function getEventWithSlots(
     .prepare(
       `SELECT s.*,
          COALESCE(
-           (SELECT COUNT(*) FROM event_registrations r
+           (SELECT COALESCE(SUM(r.participant_count), 0) FROM event_registrations r
             WHERE r.event_slot_id = s.id AND r.status = 'confirmed'),
            0
          ) AS registered_count
@@ -152,7 +152,7 @@ export async function getEventSlotById(
     .prepare(
       `SELECT s.*,
          COALESCE(
-           (SELECT COUNT(*) FROM event_registrations r
+           (SELECT COALESCE(SUM(r.participant_count), 0) FROM event_registrations r
             WHERE r.event_slot_id = s.id AND r.status = 'confirmed'),
            0
          ) AS registered_count

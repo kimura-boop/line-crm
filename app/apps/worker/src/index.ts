@@ -547,6 +547,16 @@ async function scheduled(
     console.error('Insight fetch error:', e);
   }
 
+  // 過去日程の自動削除（当日を過ぎたスロットを非アクティブ化）
+  try {
+    const today = new Date().toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }).replace(/\//g, '-').split('-').map((v: string, i: number) => i === 0 ? v : v.padStart(2, '0')).join('-');
+    await env.DB.prepare(
+      `UPDATE event_slots SET is_active = 0 WHERE is_active = 1 AND event_date < ?`
+    ).bind(today).run();
+  } catch (e) {
+    console.error('Auto delete past slots error:', e);
+  }
+
   // Cross-account duplicate detection & auto-tagging
   try {
     const { processDuplicateDetection } = await import('./services/duplicate-detect.js');
