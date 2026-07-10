@@ -323,6 +323,7 @@ eventRegistrations.get('/api/events/:id/registrations', async (c) => {
     eventDate: r.event_date,
     timeSlot: r.time_slot,
     status: r.status,
+    participantCount: r.participant_count ?? 1,
     createdAt: r.created_at,
   })));
 });
