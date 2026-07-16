@@ -263,7 +263,7 @@ export async function getEventRegistrations(
       `SELECT r.*, s.event_date, s.time_slot, r.participant_count
        FROM event_registrations r
        JOIN event_slots s ON s.id = r.event_slot_id
-       WHERE s.event_id = ? AND r.status = 'confirmed'
+       WHERE s.event_id = ? AND r.status = 'confirmed' AND s.event_date >= date('now', '+9 hours')
        ORDER BY s.event_date ASC, s.time_slot ASC, r.created_at ASC`,
     )
     .bind(eventId)
